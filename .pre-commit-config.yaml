@@ -1,0 +1,10 @@
+repos:
+  - repo: local
+    hooks:
+      - id: generate-docs
+        name: Generate README Config Reference
+        entry: bash -c 'python scripts/generate_readme.py && git diff --quiet README.md || git add README.md'
+        language: system
+        pass_filenames: false
+        always_run: true
+        stages: [pre-commit]

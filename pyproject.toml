@@ -17,6 +17,7 @@ dependencies = [
 [project.optional-dependencies]
 dev = [
     "ruff>=0.9.0",
+    "pre-commit>=4.0.0",
 ]
 
 [project.scripts]
@@ -26,7 +27,7 @@ agents = "cli:main"
 py-modules = ["cli"]
 
 [tool.setuptools.packages.find]
-include = ["models*"]
+include = ["models*", "scripts*"]
 
 [tool.ruff]
 line-length = 88

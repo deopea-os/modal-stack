@@ -122,76 +122,96 @@ agents run my_model
 
 ---
 
+<!-- BEGIN GENERATED CONFIG REFERENCE -->
 ## Config Reference
 
 All fields except `model.name` are optional. Defaults are shown below.
 
 ### Top-level
 
-| Field       | Required | Default                | Description                                   |
-| ----------- | -------- | ---------------------- | --------------------------------------------- |
-| `model`     | Yes      | —                      | Model identity section                        |
-| `app_name`  | No       | Slug from `model.name` | Modal app name (e.g. `llama-3.1-8b-instruct`) |
-| `engine`    | No       | See below              | Serving engine settings                       |
-| `gpu`       | No       | See below              | GPU type and count                            |
-| `scaling`   | No       | See below              | Timeout and concurrency                       |
-| `vllm_args` | No       | See below              | vLLM CLI flags                                |
-| `image`     | No       | See below              | Container image settings                      |
-| `volumes`   | No       | See below              | Modal Volume names                            |
+| Field | Required | Default | Description |
+| ----- | -------- | ------- | ----------- |
+| `app_name` | No | Slug from `model.name` | Modal app name used to identify this deployment. |
+| `model` | Yes | — | Model identity and serving name configuration |
+| `engine` | No | See below | LLM serving engine configuration |
+| `gpu` | No | See below | GPU hardware configuration for the Modal deployment |
+| `scaling` | No | See below | Autoscaling, timeout, and concurrency settings for the Modal deployment |
+| `vllm_args` | No | See below | Arguments passed to the 'vllm serve' command |
+| `image` | No | See below | Container image settings |
+| `volumes` | No | See below | Modal Volume names for persistent caching |
 
 ### `model`
 
-| Field         | Required | Default | Description                                            |
-| ------------- | -------- | ------- | ------------------------------------------------------ |
-| `name`        | **Yes**  | —       | Hugging Face repo ID, e.g. `google/gemma-4-26B-A4B-it` |
-| `revision`    | No       | `null`  | Commit hash to pin. Omit to always use latest          |
-| `served_name` | No       | `"llm"` | Name clients use in the OpenAI `model` field           |
+| Field | Required | Default | Description |
+| ----- | -------- | ------- | ----------- |
+| `name` | **Yes** | — | Hugging Face repository ID for the model weights. |
+| `revision` | No | `null` | Git commit hash to pin model weights to a specific version. |
+| `served_name` | No | `"llm"` | The model name that clients send in the OpenAI API 'model' field when making requests. |
 
 ### `engine`
 
-| Field       | Default    | Description                                                          |
-| ----------- | ---------- | -------------------------------------------------------------------- |
-| `type`      | `"vllm"`   | Serving engine. Only `"vllm"` is supported today                     |
-| `version`   | `"0.19.0"` | vLLM pip version installed in the container                          |
-| `extra_pip` | `[]`       | Extra packages installed alongside vLLM (e.g. `transformers==5.5.0`) |
+| Field | Default | Description |
+| ----- | ------- | ----------- |
+| `type` | `"vllm"` | Serving engine type. |
+| `version` | `"0.19.0"` | Version of the serving engine (vLLM) to install via pip in the container image. |
+| `extra_pip` | `[]` | Additional pip packages installed alongside the serving engine. |
 
 ### `gpu`
 
-| Field   | Default  | Description                                                       |
-| ------- | -------- | ----------------------------------------------------------------- |
-| `type`  | `"H200"` | Modal GPU type: `A10G`, `A100`, `H100`, `H200`, `B200`            |
-| `count` | `1`      | GPUs per replica. Use `>1` for tensor parallelism on large models |
+| Field | Default | Description |
+| ----- | ------- | ----------- |
+| `type` | `"H200"` | Modal GPU type or fallback list. |
+| `count` | `1` | Number of GPUs per replica. |
+
+**Available GPU types:**
+
+| GPU | Memory | Architecture | Max Count | Notes |
+| --- | ------ | ------------ | --------- | ----- |
+| `T4` | 16 GB | Turing | 8 | Budget option for small models and experimentation. |
+| `L4` | 24 GB | Ada Lovelace | 8 | Good cost/performance for inference workloads up to ~7B parameters. |
+| `A10` | 24 GB | Ampere | 4 | Similar to L4 but on Ampere architecture. Max 4 GPUs (96 GB total). |
+| `L40S` | 48 GB | Ada Lovelace | 8 | Excellent cost/performance trade-off. Recommended starting point for inference. |
+| `A100` | 40 GB | Ampere | 8 | 40GB variant. May be auto-upgraded to 80GB A100 at no extra cost. |
+| `A100-40GB` | 40 GB | Ampere | 8 | Explicitly requests 40GB A100. No automatic upgrade. |
+| `A100-80GB` | 80 GB | Ampere | 8 | Explicitly requests 80GB A100. Use for models requiring >40GB VRAM. |
+| `RTX-PRO-6000` | 96 GB | Blackwell | 8 | Professional workstation GPU with 96GB VRAM. |
+| `H100` | 80 GB | Hopper | 8 | SXM variant. May be auto-upgraded to H200 at no extra cost. Strong software ecosystem support. |
+| `H100!` | 80 GB | Hopper | 8 | Explicitly requests H100 with NO automatic upgrade to H200. Use for benchmarking or when strict memory assumptions are needed. |
+| `H200` | 141 GB | Hopper | 8 | 141GB HBM3e at 4.8TB/s bandwidth. 1.75x capacity and 1.4x bandwidth vs H100. |
+| `B200` | 192 GB | Blackwell | 8 | NVIDIA's flagship data center chip. Highest performance for large models. |
+| `B200+` | 192 GB | Blackwell | 8 | Opt-in upgrade: allows Modal to schedule on B200 or B300 GPUs. Billed as B200. B300 requires CUDA 13.0+. |
 
 **Sizing guide:**
 
-| Model size       | Recommended GPU | Count |
-| ---------------- | --------------- | ----- |
-| < 8B             | A10G or A100    | 1     |
-| 8B – 14B         | A100            | 1     |
-| 14B – 30B        | H100            | 1     |
-| 30B – 70B        | H200            | 1–2   |
-| 70B+ / large MoE | H200 or B200    | 2–8   |
+| Model size | Recommended GPU | Count |
+| ---------- | --------------- | ----- |
+| < 8B | A10 or A100 | 1 |
+| 8B – 14B | A100 | 1 |
+| 14B – 30B | H100 | 1 |
+| 30B – 70B | H200 | 1–2 |
+| 70B+ / large MoE | H200 or B200 | 2–8 |
 
 ### `scaling`
 
-| Field                      | Default | Description                                                           |
-| -------------------------- | ------- | --------------------------------------------------------------------- |
-| `scaledown_window_minutes` | `15`    | Minutes a replica stays alive with no requests before scaling to zero |
-| `timeout_minutes`          | `10`    | Container startup timeout. Increase for very large models             |
-| `max_concurrent_inputs`    | `100`   | Max simultaneous requests per replica                                 |
-| `fast_boot`                | `false` | Skip torch compilation for faster cold starts (lower throughput)      |
+| Field | Default | Description |
+| ----- | ------- | ----------- |
+| `scaledown_window_minutes` | `15` | Minutes a replica stays alive with no incoming requests before scaling to zero. |
+| `timeout_minutes` | `10` | Container startup timeout in minutes. |
+| `max_concurrent_inputs` | `100` | Maximum number of simultaneous requests a single replica will accept. |
+| `fast_boot` | `false` | When true, skips torch compilation during startup for faster cold starts at the cost of lower throughput. |
 
 ### `vllm_args`
 
-| Field              | Default | Description                                                            |
-| ------------------ | ------- | ---------------------------------------------------------------------- |
-| `async_scheduling` | `true`  | Enable async scheduling for better throughput under load               |
-| `extra_args`       | `[]`    | Arbitrary `vllm serve` CLI flags (each token is a separate list entry) |
+| Field | Default | Description |
+| ----- | ------- | ----------- |
+| `async_scheduling` | `true` | Enable vLLM's async scheduling for better throughput under concurrent load. |
+| `extra_args` | `[]` | Arbitrary CLI flags appended verbatim to the 'vllm serve' command. |
 
 Common `extra_args` patterns:
 
 ```yaml
-# Reasoning / tool-calling models (e.g. Gemma 4, DeepSeek R1)
+# Reasoning / tool-calling models
+# Enable function calling and chain-of-thought parsing (e.g. Gemma 4, DeepSeek R1).
 extra_args:
   - "--enable-auto-tool-choice"
   - "--reasoning-parser"
@@ -199,37 +219,64 @@ extra_args:
   - "--tool-call-parser"
   - "gemma4"
 
-# Limit context window to reduce VRAM usage
+# Context window limit
+# Limit the maximum context length to reduce VRAM usage.
 extra_args:
   - "--max-model-len"
   - "8192"
 
-# Community models that use custom code
+# Community models with custom code
+# Required for models that use custom modeling code not in transformers.
 extra_args:
   - "--trust-remote-code"
 
-# Disable multimodal inputs (text-only, saves memory)
+# Disable multimodal inputs
+# Restrict to text-only to save memory on multimodal-capable models.
 extra_args:
   - "--limit-mm-per-prompt"
   - '{"image": 0, "video": 0, "audio": 0}'
+
+# MoE expert parallelism
+# Enable expert parallelism for Mixture-of-Experts models (e.g. Qwen3-Coder, Mixtral).
+extra_args:
+  - "--enable-expert-parallel"
+
+# Prefix caching
+# Cache KV blocks for common prefixes to speed up repeated prompts.
+extra_args:
+  - "--enable-prefix-caching"
+
+# GPU memory utilization
+# Fraction of GPU VRAM vLLM is allowed to use (default 0.9).
+extra_args:
+  - "--gpu-memory-utilization"
+  - "0.95"
 ```
 
 ### `image`
 
-| Field    | Default                                  | Description                                              |
-| -------- | ---------------------------------------- | -------------------------------------------------------- |
-| `base`   | `"nvidia/cuda:12.9.0-devel-ubuntu22.04"` | Base Docker image                                        |
-| `python` | `"3.12"`                                 | Python version added to the base image                   |
-| `env`    | `{}`                                     | Environment variables baked into the image at build time |
+| Field | Default | Description |
+| ----- | ------- | ----------- |
+| `base` | `"nvidia/cuda:12.9.0-devel-ubuntu22.04"` | Base Docker image for the container. |
+| `python` | `"3.12"` | Python version installed in the container by Modal. |
+| `env` | `{}` | Environment variables baked into the container image at build time. |
+
+Common environment variables:
+
+| Variable | Value | Description |
+| -------- | ----- | ----------- |
+| `HF_XET_HIGH_PERFORMANCE` | `"1"` | Enable faster Hugging Face Hub downloads via Xet transport. |
+| `VLLM_USE_DEEP_GEMM` | `"1"` | Enable DeepGEMM FP8 kernels for MoE models. Only supported on Blackwell GPUs (B200/B300), NOT Hopper (H100/H200). |
 
 ### `volumes`
 
-| Field        | Default               | Description                                 |
-| ------------ | --------------------- | ------------------------------------------- |
-| `hf_cache`   | `"huggingface-cache"` | Modal Volume for Hugging Face weight cache  |
-| `vllm_cache` | `"vllm-cache"`        | Modal Volume for vLLM JIT compilation cache |
+| Field | Default | Description |
+| ----- | ------- | ----------- |
+| `hf_cache` | `"huggingface-cache"` | Modal Volume name for the Hugging Face model weight cache. |
+| `vllm_cache` | `"vllm-cache"` | Modal Volume name for vLLM's JIT compilation cache. |
 
-By default all deployments share the same volumes, so weights downloaded for one model are available to all. Use unique names to isolate a model's cache.
+Modal Volume names for persistent caching. By default all deployments share the same volumes, so weights downloaded for one model are available to all. Use unique names to isolate a model's cache.
+<!-- END GENERATED CONFIG REFERENCE -->
 
 ---
 
