@@ -1,0 +1,33 @@
+# yaml-language-server: $schema=../schemas/model-config.schema.json
+app_name: "qwen3-coder-next"
+
+model:
+  name: "Qwen/Qwen3-Coder-Next-FP8"
+  served_name: "llm"
+
+gpu:
+  type: "H200"
+  count: 1
+
+scaling:
+  scaledown_window_minutes: 5
+  timeout_minutes: 20
+  max_concurrent_inputs: 100
+  fast_boot: false
+
+vllm_args:
+  async_scheduling: true
+  extra_args:
+    - "--max-model-len"
+    - "131072"
+    - "--enable-expert-parallel"
+    - "--enable-auto-tool-choice"
+    - "--tool-call-parser"
+    - "qwen3_coder"
+    - "--enable-prefix-caching"
+
+image:
+  base: "nvidia/cuda:12.9.0-devel-ubuntu22.04"
+  python: "3.12"
+  env:
+    HF_XET_HIGH_PERFORMANCE: "1"

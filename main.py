@@ -57,11 +57,17 @@ from models.server import prepare_app
 config = ModelConfig.from_yaml(_config_path)
 _r = prepare_app(config)
 
-# All variables used inside serve() and test() are module-level globals.
-# This is required: Modal imports this module in the container to locate
-# these functions by name. A function defined inside another function is
-# a local/closure that Modal cannot import without serialization (which is
-# Python-version-sensitive). Module-level functions have no such constraint.
+_root = Path(__file__).parent
+
+# Bake the config file and the models package into the container image.
+# Modal automounts main.py but not data files or local packages reliably.
+_image = (
+    _r.image
+    .env({"MODEL_CONFIG": _config_name})
+    .add_local_file(str(_config_path), f"/root/configs/{_config_name}.yaml")
+    .add_local_dir(str(_root / "models"), "/root/models")
+)
+
 app = _r.app
 _cmd = _r.cmd
 _served_name = config.model.served_name
@@ -69,7 +75,7 @@ _timeout_s = _r.timeout
 
 
 @app.function(
-    image=_r.image,
+    image=_image,
     gpu=_r.gpu,
     scaledown_window=_r.scaledown,
     timeout=_r.timeout,

@@ -128,65 +128,65 @@ All fields except `model.name` are optional. Defaults are shown below.
 
 ### Top-level
 
-| Field | Required | Default | Description |
-|-------|----------|---------|-------------|
-| `model` | Yes | — | Model identity section |
-| `app_name` | No | Slug from `model.name` | Modal app name (e.g. `llama-3.1-8b-instruct`) |
-| `engine` | No | See below | Serving engine settings |
-| `gpu` | No | See below | GPU type and count |
-| `scaling` | No | See below | Timeout and concurrency |
-| `vllm_args` | No | See below | vLLM CLI flags |
-| `image` | No | See below | Container image settings |
-| `volumes` | No | See below | Modal Volume names |
+| Field       | Required | Default                | Description                                   |
+| ----------- | -------- | ---------------------- | --------------------------------------------- |
+| `model`     | Yes      | —                      | Model identity section                        |
+| `app_name`  | No       | Slug from `model.name` | Modal app name (e.g. `llama-3.1-8b-instruct`) |
+| `engine`    | No       | See below              | Serving engine settings                       |
+| `gpu`       | No       | See below              | GPU type and count                            |
+| `scaling`   | No       | See below              | Timeout and concurrency                       |
+| `vllm_args` | No       | See below              | vLLM CLI flags                                |
+| `image`     | No       | See below              | Container image settings                      |
+| `volumes`   | No       | See below              | Modal Volume names                            |
 
 ### `model`
 
-| Field | Required | Default | Description |
-|-------|----------|---------|-------------|
-| `name` | **Yes** | — | Hugging Face repo ID, e.g. `google/gemma-4-26B-A4B-it` |
-| `revision` | No | `null` | Commit hash to pin. Omit to always use latest |
-| `served_name` | No | `"llm"` | Name clients use in the OpenAI `model` field |
+| Field         | Required | Default | Description                                            |
+| ------------- | -------- | ------- | ------------------------------------------------------ |
+| `name`        | **Yes**  | —       | Hugging Face repo ID, e.g. `google/gemma-4-26B-A4B-it` |
+| `revision`    | No       | `null`  | Commit hash to pin. Omit to always use latest          |
+| `served_name` | No       | `"llm"` | Name clients use in the OpenAI `model` field           |
 
 ### `engine`
 
-| Field | Default | Description |
-|-------|---------|-------------|
-| `type` | `"vllm"` | Serving engine. Only `"vllm"` is supported today |
-| `version` | `"0.19.0"` | vLLM pip version installed in the container |
-| `extra_pip` | `[]` | Extra packages installed alongside vLLM (e.g. `transformers==5.5.0`) |
+| Field       | Default    | Description                                                          |
+| ----------- | ---------- | -------------------------------------------------------------------- |
+| `type`      | `"vllm"`   | Serving engine. Only `"vllm"` is supported today                     |
+| `version`   | `"0.19.0"` | vLLM pip version installed in the container                          |
+| `extra_pip` | `[]`       | Extra packages installed alongside vLLM (e.g. `transformers==5.5.0`) |
 
 ### `gpu`
 
-| Field | Default | Description |
-|-------|---------|-------------|
-| `type` | `"H200"` | Modal GPU type: `A10G`, `A100`, `H100`, `H200`, `B200` |
-| `count` | `1` | GPUs per replica. Use `>1` for tensor parallelism on large models |
+| Field   | Default  | Description                                                       |
+| ------- | -------- | ----------------------------------------------------------------- |
+| `type`  | `"H200"` | Modal GPU type: `A10G`, `A100`, `H100`, `H200`, `B200`            |
+| `count` | `1`      | GPUs per replica. Use `>1` for tensor parallelism on large models |
 
 **Sizing guide:**
 
-| Model size | Recommended GPU | Count |
-|------------|-----------------|-------|
-| < 8B       | A10G or A100    | 1     |
-| 8B – 14B   | A100            | 1     |
-| 14B – 30B  | H100            | 1     |
-| 30B – 70B  | H200            | 1–2   |
-| 70B+ / large MoE | H200 or B200 | 2–8 |
+| Model size       | Recommended GPU | Count |
+| ---------------- | --------------- | ----- |
+| < 8B             | A10G or A100    | 1     |
+| 8B – 14B         | A100            | 1     |
+| 14B – 30B        | H100            | 1     |
+| 30B – 70B        | H200            | 1–2   |
+| 70B+ / large MoE | H200 or B200    | 2–8   |
 
 ### `scaling`
 
-| Field | Default | Description |
-|-------|---------|-------------|
-| `scaledown_window_minutes` | `15` | Minutes a replica stays alive with no requests before scaling to zero |
-| `timeout_minutes` | `10` | Container startup timeout. Increase for very large models |
-| `max_concurrent_inputs` | `100` | Max simultaneous requests per replica |
-| `fast_boot` | `false` | Skip torch compilation for faster cold starts (lower throughput) |
+| Field                      | Default | Description                                                           |
+| -------------------------- | ------- | --------------------------------------------------------------------- |
+| `scaledown_window_minutes` | `15`    | Minutes a replica stays alive with no requests before scaling to zero |
+| `timeout_minutes`          | `10`    | Container startup timeout. Increase for very large models             |
+| `max_concurrent_inputs`    | `100`   | Max simultaneous requests per replica                                 |
+| `fast_boot`                | `false` | Skip torch compilation for faster cold starts (lower throughput)      |
 
 ### `vllm_args`
 
-| Field | Default | Description |
-|-------|---------|-------------|
-| `async_scheduling` | `true` | Enable async scheduling for better throughput under load |
-| `extra_args` | `[]` | Arbitrary `vllm serve` CLI flags (each token is a separate list entry) |
+| Field              | Default | Description                                                            |
+| ------------------ | ------- | ---------------------------------------------------------------------- |
+| `async_scheduling` | `true`  | Enable async scheduling for better throughput under load               |
+| `extra_args`       | `[]`    | Arbitrary `vllm serve` CLI flags (each token is a separate list entry) |
 
 Common `extra_args` patterns:
 
@@ -216,18 +216,18 @@ extra_args:
 
 ### `image`
 
-| Field | Default | Description |
-|-------|---------|-------------|
-| `base` | `"nvidia/cuda:12.9.0-devel-ubuntu22.04"` | Base Docker image |
-| `python` | `"3.12"` | Python version added to the base image |
-| `env` | `{}` | Environment variables baked into the image at build time |
+| Field    | Default                                  | Description                                              |
+| -------- | ---------------------------------------- | -------------------------------------------------------- |
+| `base`   | `"nvidia/cuda:12.9.0-devel-ubuntu22.04"` | Base Docker image                                        |
+| `python` | `"3.12"`                                 | Python version added to the base image                   |
+| `env`    | `{}`                                     | Environment variables baked into the image at build time |
 
 ### `volumes`
 
-| Field | Default | Description |
-|-------|---------|-------------|
-| `hf_cache` | `"huggingface-cache"` | Modal Volume for Hugging Face weight cache |
-| `vllm_cache` | `"vllm-cache"` | Modal Volume for vLLM JIT compilation cache |
+| Field        | Default               | Description                                 |
+| ------------ | --------------------- | ------------------------------------------- |
+| `hf_cache`   | `"huggingface-cache"` | Modal Volume for Hugging Face weight cache  |
+| `vllm_cache` | `"vllm-cache"`        | Modal Volume for vLLM JIT compilation cache |
 
 By default all deployments share the same volumes, so weights downloaded for one model are available to all. Use unique names to isolate a model's cache.
 
@@ -267,13 +267,13 @@ The `/docs` route on the URL serves interactive Swagger UI for exploring the API
 
 ## Editing the Infrastructure
 
-| What to change | Where |
-|----------------|-------|
-| Add a config field or change a default | `models/config.py` |
-| Change how the container image is built | `models/image.py` |
-| Change GPU, volumes, or vLLM command construction | `models/server.py` |
-| Change the health check / test request | `models/health.py` |
-| Add SGLang engine support | `models/image.py` + `models/server.py` + add `"sglang"` to `Literal` in `models/config.py` |
+| What to change                                    | Where                                                                                      |
+| ------------------------------------------------- | ------------------------------------------------------------------------------------------ |
+| Add a config field or change a default            | `models/config.py`                                                                         |
+| Change how the container image is built           | `models/image.py`                                                                          |
+| Change GPU, volumes, or vLLM command construction | `models/server.py`                                                                         |
+| Change the health check / test request            | `models/health.py`                                                                         |
+| Add SGLang engine support                         | `models/image.py` + `models/server.py` + add `"sglang"` to `Literal` in `models/config.py` |
 
 **Never hardcode model-specific values in Python.** All model configuration belongs in `configs/*.yaml`.
 
@@ -281,12 +281,12 @@ The `/docs` route on the URL serves interactive Swagger UI for exploring the API
 
 ## Dependencies
 
-| Package | Purpose |
-|---------|---------|
-| `modal` | Cloud infrastructure SDK |
-| `pydantic` | Config validation |
-| `pyyaml` | YAML parsing |
-| `aiohttp` | Async HTTP client for health checks |
+| Package    | Purpose                             |
+| ---------- | ----------------------------------- |
+| `modal`    | Cloud infrastructure SDK            |
+| `pydantic` | Config validation                   |
+| `pyyaml`   | YAML parsing                        |
+| `aiohttp`  | Async HTTP client for health checks |
 
 Managed in `pyproject.toml`. Install with:
 

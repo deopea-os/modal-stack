@@ -1,0 +1,441 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/deopea/agents/schemas/model-config.schema.json",
+  "title": "Modal LLM Model Configuration",
+  "description": "Configuration schema for deploying OpenAI-compatible LLM inference endpoints on Modal using vLLM. Each YAML file in configs/ defines a single model deployment.",
+  "type": "object",
+  "required": ["model"],
+  "additionalProperties": false,
+  "properties": {
+    "app_name": {
+      "type": "string",
+      "description": "Modal app name used to identify this deployment. If omitted, defaults to a slug derived from model.name (e.g. 'google/gemma-4-26B-A4B-it' becomes 'gemma-4-26b-a4b-it'). Must be unique across your Modal workspace if deploying multiple models simultaneously.",
+      "pattern": "^[a-z0-9][a-z0-9._-]*$",
+      "examples": ["gemma4-26b", "llama-3.1-8b-instruct", "qwen3-coder-next"]
+    },
+    "model": { "$ref": "#/$defs/ModelSection" },
+    "engine": { "$ref": "#/$defs/EngineConfig" },
+    "gpu": { "$ref": "#/$defs/GpuConfig" },
+    "scaling": { "$ref": "#/$defs/ScalingConfig" },
+    "vllm_args": { "$ref": "#/$defs/VllmArgsConfig" },
+    "image": { "$ref": "#/$defs/ImageConfig" },
+    "volumes": { "$ref": "#/$defs/VolumesConfig" }
+  },
+  "$defs": {
+    "ModelSection": {
+      "type": "object",
+      "title": "Model",
+      "description": "Model identity and serving name configuration.",
+      "required": ["name"],
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "Hugging Face repository ID for the model weights. This is the only required field in the entire configuration.",
+          "examples": [
+            "google/gemma-4-26B-A4B-it",
+            "meta-llama/Llama-3.1-8B-Instruct",
+            "Qwen/Qwen3-Coder-Next-FP8",
+            "deepseek-ai/DeepSeek-R1"
+          ]
+        },
+        "revision": {
+          "type": ["string", "null"],
+          "default": null,
+          "description": "Git commit hash to pin model weights to a specific version. Prevents surprise weight updates when the Hugging Face repo is updated. Find the latest commit hash on the model page under Files > Commits. If omitted, always pulls the latest revision.",
+          "pattern": "^[0-9a-f]{7,40}$",
+          "examples": ["47b6801b24d15ff9bcd8c96dfaea0be9ed3a0301"]
+        },
+        "served_name": {
+          "type": "string",
+          "default": "llm",
+          "description": "The model name that clients send in the OpenAI API 'model' field when making requests. Using a consistent short name like 'llm' allows swapping the underlying model without changing client code.",
+          "examples": ["llm", "gpt-4", "claude"]
+        }
+      }
+    },
+    "EngineConfig": {
+      "type": "object",
+      "title": "Engine",
+      "description": "LLM serving engine configuration. Controls which inference framework is used and how it is installed.",
+      "additionalProperties": false,
+      "default": {},
+      "properties": {
+        "type": {
+          "type": "string",
+          "enum": ["vllm"],
+          "default": "vllm",
+          "description": "Serving engine type. Currently only 'vllm' is supported. Future options may include 'sglang'."
+        },
+        "version": {
+          "type": "string",
+          "default": "0.19.0",
+          "description": "Version of the serving engine (vLLM) to install via pip in the container image. Pin to a specific version for reproducible deployments.",
+          "pattern": "^\\d+\\.\\d+(\\.\\d+)?(\\.(dev|post|rc)\\d+)?$",
+          "examples": ["0.19.0", "0.18.2", "0.20.0"]
+        },
+        "extra_pip": {
+          "type": "array",
+          "items": { "type": "string" },
+          "default": [],
+          "description": "Additional pip packages installed alongside the serving engine. Use for model-specific dependencies that are not bundled with vLLM (e.g. newer transformers versions, custom tokenizers).",
+          "examples": [["transformers==5.5.0"], ["flash-attn>=2.5.0"]]
+        }
+      }
+    },
+    "GpuConfig": {
+      "type": "object",
+      "title": "GPU",
+      "description": "GPU hardware configuration for the Modal deployment. Determines the accelerator type, count, and optional fallback strategy.",
+      "additionalProperties": false,
+      "default": {},
+      "properties": {
+        "type": {
+          "oneOf": [
+            {
+              "type": "string",
+              "enum": [
+                "T4",
+                "L4",
+                "A10",
+                "L40S",
+                "A100",
+                "A100-40GB",
+                "A100-80GB",
+                "RTX-PRO-6000",
+                "H100",
+                "H100!",
+                "H200",
+                "B200",
+                "B200+"
+              ],
+              "description": "A single GPU type. Use 'gpu.count' to specify the number of GPUs."
+            },
+            {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "pattern": "^(T4|L4|A10|L40S|A100|A100-40GB|A100-80GB|RTX-PRO-6000|H100|H100!|H200|B200|B200\\+)(:[1-8])?$"
+              },
+              "minItems": 1,
+              "description": "An ordered list of GPU fallbacks. Modal tries each option in order, falling back to the next if the preferred type is unavailable. Each entry may include an optional ':N' count suffix (e.g. 'A100-40GB:2'). When using the array form, 'gpu.count' is ignored — specify counts per entry instead."
+            }
+          ],
+          "default": "H200",
+          "description": "Modal GPU type or fallback list. Accepts a single GPU type string or an array for fallback scheduling. Modal tries each GPU in order and falls back to the next if unavailable. See https://modal.com/docs/guide/gpu for details and https://modal.com/pricing for costs.",
+          "x-gpu-types": {
+            "description": "Available GPU types with memory specifications and behavior notes.",
+            "types": [
+              {
+                "id": "T4",
+                "memory_gb": 16,
+                "architecture": "Turing",
+                "max_count": 8,
+                "notes": "Budget option for small models and experimentation."
+              },
+              {
+                "id": "L4",
+                "memory_gb": 24,
+                "architecture": "Ada Lovelace",
+                "max_count": 8,
+                "notes": "Good cost/performance for inference workloads up to ~7B parameters."
+              },
+              {
+                "id": "A10",
+                "memory_gb": 24,
+                "architecture": "Ampere",
+                "max_count": 4,
+                "notes": "Similar to L4 but on Ampere architecture. Max 4 GPUs (96 GB total)."
+              },
+              {
+                "id": "L40S",
+                "memory_gb": 48,
+                "architecture": "Ada Lovelace",
+                "max_count": 8,
+                "notes": "Excellent cost/performance trade-off. Recommended starting point for inference."
+              },
+              {
+                "id": "A100",
+                "memory_gb": 40,
+                "architecture": "Ampere",
+                "max_count": 8,
+                "notes": "40GB variant. May be auto-upgraded to 80GB A100 at no extra cost."
+              },
+              {
+                "id": "A100-40GB",
+                "memory_gb": 40,
+                "architecture": "Ampere",
+                "max_count": 8,
+                "notes": "Explicitly requests 40GB A100. No automatic upgrade."
+              },
+              {
+                "id": "A100-80GB",
+                "memory_gb": 80,
+                "architecture": "Ampere",
+                "max_count": 8,
+                "notes": "Explicitly requests 80GB A100. Use for models requiring >40GB VRAM."
+              },
+              {
+                "id": "RTX-PRO-6000",
+                "memory_gb": 96,
+                "architecture": "Blackwell",
+                "max_count": 8,
+                "notes": "Professional workstation GPU with 96GB VRAM."
+              },
+              {
+                "id": "H100",
+                "memory_gb": 80,
+                "architecture": "Hopper",
+                "max_count": 8,
+                "notes": "SXM variant. May be auto-upgraded to H200 at no extra cost. Strong software ecosystem support."
+              },
+              {
+                "id": "H100!",
+                "memory_gb": 80,
+                "architecture": "Hopper",
+                "max_count": 8,
+                "notes": "Explicitly requests H100 with NO automatic upgrade to H200. Use for benchmarking or when strict memory assumptions are needed."
+              },
+              {
+                "id": "H200",
+                "memory_gb": 141,
+                "architecture": "Hopper",
+                "max_count": 8,
+                "notes": "141GB HBM3e at 4.8TB/s bandwidth. 1.75x capacity and 1.4x bandwidth vs H100."
+              },
+              {
+                "id": "B200",
+                "memory_gb": 192,
+                "architecture": "Blackwell",
+                "max_count": 8,
+                "notes": "NVIDIA's flagship data center chip. Highest performance for large models."
+              },
+              {
+                "id": "B200+",
+                "memory_gb": 192,
+                "architecture": "Blackwell",
+                "max_count": 8,
+                "notes": "Opt-in upgrade: allows Modal to schedule on B200 or B300 GPUs. Billed as B200. B300 requires CUDA 13.0+."
+              }
+            ]
+          },
+          "x-sizing-guide": {
+            "description": "Recommended GPU selection based on model parameter count.",
+            "recommendations": [
+              { "model_size": "< 8B", "gpu": "A10 or A100", "count": 1 },
+              { "model_size": "8B – 14B", "gpu": "A100", "count": 1 },
+              { "model_size": "14B – 30B", "gpu": "H100", "count": 1 },
+              { "model_size": "30B – 70B", "gpu": "H200", "count": "1–2" },
+              {
+                "model_size": "70B+ / large MoE",
+                "gpu": "H200 or B200",
+                "count": "2–8"
+              }
+            ]
+          },
+          "examples": [
+            "H200",
+            "A100-80GB",
+            ["H100", "A100-80GB"],
+            ["B200", "H200:2"]
+          ]
+        },
+        "count": {
+          "type": "integer",
+          "default": 1,
+          "minimum": 1,
+          "maximum": 8,
+          "description": "Number of GPUs per replica. Only applies when 'gpu.type' is a single string — ignored when 'gpu.type' is a fallback array (use the ':N' suffix per entry instead). Use >1 for tensor parallelism on large models. B200, H200, H100, A100, L4, T4, and L40S support up to 8 GPUs (up to 1,536 GB GPU RAM). A10 supports up to 4 GPUs (up to 96 GB GPU RAM). Note: requesting more than 2 GPUs usually results in larger wait times."
+        }
+      }
+    },
+    "ScalingConfig": {
+      "type": "object",
+      "title": "Scaling",
+      "description": "Autoscaling, timeout, and concurrency settings for the Modal deployment.",
+      "additionalProperties": false,
+      "default": {},
+      "properties": {
+        "scaledown_window_minutes": {
+          "type": "integer",
+          "default": 15,
+          "minimum": 0,
+          "description": "Minutes a replica stays alive with no incoming requests before scaling to zero. Lower values save cost but increase cold start frequency. Set to 0 for immediate scale-down after the last request completes.",
+          "examples": [1, 5, 15, 30]
+        },
+        "timeout_minutes": {
+          "type": "integer",
+          "default": 10,
+          "minimum": 1,
+          "description": "Container startup timeout in minutes. Modal will kill the container if it does not become healthy within this window. Increase for very large models that take longer to load weights into GPU memory.",
+          "examples": [10, 15, 20, 30]
+        },
+        "max_concurrent_inputs": {
+          "type": "integer",
+          "default": 100,
+          "minimum": 1,
+          "description": "Maximum number of simultaneous requests a single replica will accept. Tune based on GPU memory and model size — larger models or longer contexts may need a lower value to avoid OOM errors.",
+          "examples": [10, 50, 100, 200]
+        },
+        "fast_boot": {
+          "type": "boolean",
+          "default": false,
+          "description": "When true, skips torch compilation during startup for faster cold starts at the cost of lower throughput. Set to true during development/testing and false in production for best inference performance."
+        }
+      }
+    },
+    "VllmArgsConfig": {
+      "type": "object",
+      "title": "vLLM Arguments",
+      "description": "Arguments passed to the 'vllm serve' command. Controls async scheduling and arbitrary CLI flags.",
+      "additionalProperties": false,
+      "default": {},
+      "properties": {
+        "async_scheduling": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable vLLM's async scheduling for better throughput under concurrent load. Adds '--disable-async-output-proc' when set to false."
+        },
+        "extra_args": {
+          "type": "array",
+          "items": { "type": "string" },
+          "default": [],
+          "description": "Arbitrary CLI flags appended verbatim to the 'vllm serve' command. Each list element is one shell token — flags and their values must be separate entries. See https://docs.vllm.ai/en/latest/serving/openai_compatible_server.html for all available flags.",
+          "examples": [
+            ["--max-model-len", "8192"],
+            ["--enable-auto-tool-choice", "--tool-call-parser", "hermes"],
+            ["--trust-remote-code"],
+            ["--gpu-memory-utilization", "0.9"],
+            ["--enable-prefix-caching"],
+            ["--enable-expert-parallel"],
+            [
+              "--limit-mm-per-prompt",
+              "{\"image\": 0, \"video\": 0, \"audio\": 0}"
+            ]
+          ],
+          "x-common-patterns": {
+            "description": "Frequently used extra_args combinations for different model types.",
+            "patterns": [
+              {
+                "name": "Reasoning / tool-calling models",
+                "description": "Enable function calling and chain-of-thought parsing (e.g. Gemma 4, DeepSeek R1).",
+                "example": [
+                  "--enable-auto-tool-choice",
+                  "--reasoning-parser",
+                  "gemma4",
+                  "--tool-call-parser",
+                  "gemma4"
+                ]
+              },
+              {
+                "name": "Context window limit",
+                "description": "Limit the maximum context length to reduce VRAM usage.",
+                "example": ["--max-model-len", "8192"]
+              },
+              {
+                "name": "Community models with custom code",
+                "description": "Required for models that use custom modeling code not in transformers.",
+                "example": ["--trust-remote-code"]
+              },
+              {
+                "name": "Disable multimodal inputs",
+                "description": "Restrict to text-only to save memory on multimodal-capable models.",
+                "example": [
+                  "--limit-mm-per-prompt",
+                  "{\"image\": 0, \"video\": 0, \"audio\": 0}"
+                ]
+              },
+              {
+                "name": "MoE expert parallelism",
+                "description": "Enable expert parallelism for Mixture-of-Experts models (e.g. Qwen3-Coder, Mixtral).",
+                "example": ["--enable-expert-parallel"]
+              },
+              {
+                "name": "Prefix caching",
+                "description": "Cache KV blocks for common prefixes to speed up repeated prompts.",
+                "example": ["--enable-prefix-caching"]
+              },
+              {
+                "name": "GPU memory utilization",
+                "description": "Fraction of GPU VRAM vLLM is allowed to use (default 0.9).",
+                "example": ["--gpu-memory-utilization", "0.95"]
+              }
+            ]
+          }
+        }
+      }
+    },
+    "ImageConfig": {
+      "type": "object",
+      "title": "Image",
+      "description": "Container image settings. Controls the base Docker image, Python version, and build-time environment variables.",
+      "additionalProperties": false,
+      "default": {},
+      "properties": {
+        "base": {
+          "type": "string",
+          "default": "nvidia/cuda:12.9.0-devel-ubuntu22.04",
+          "description": "Base Docker image for the container. Must include CUDA drivers compatible with your GPU and vLLM version. See https://hub.docker.com/r/nvidia/cuda/tags for available NVIDIA CUDA images.",
+          "examples": [
+            "nvidia/cuda:12.9.0-devel-ubuntu22.04",
+            "nvidia/cuda:12.4.1-devel-ubuntu22.04",
+            "nvidia/cuda:12.1.0-devel-ubuntu22.04"
+          ]
+        },
+        "python": {
+          "type": "string",
+          "default": "3.12",
+          "description": "Python version installed in the container by Modal. Must be compatible with the chosen vLLM version.",
+          "pattern": "^3\\.\\d{1,2}$",
+          "examples": ["3.11", "3.12", "3.13"]
+        },
+        "env": {
+          "type": "object",
+          "additionalProperties": { "type": "string" },
+          "default": {},
+          "description": "Environment variables baked into the container image at build time. Values must be strings. Use for tuning runtime behavior of vLLM, CUDA, or model-specific settings.",
+          "examples": [
+            { "HF_XET_HIGH_PERFORMANCE": "1" },
+            { "VLLM_USE_DEEP_GEMM": "1", "CUDA_VISIBLE_DEVICES": "0,1" }
+          ],
+          "x-common-env-vars": {
+            "description": "Frequently used environment variables.",
+            "variables": [
+              {
+                "name": "HF_XET_HIGH_PERFORMANCE",
+                "value": "1",
+                "description": "Enable faster Hugging Face Hub downloads via Xet transport."
+              },
+              {
+                "name": "VLLM_USE_DEEP_GEMM",
+                "value": "1",
+                "description": "Enable DeepGEMM FP8 kernels for MoE models. Only supported on Blackwell GPUs (B200/B300), NOT Hopper (H100/H200)."
+              }
+            ]
+          }
+        }
+      }
+    },
+    "VolumesConfig": {
+      "type": "object",
+      "title": "Volumes",
+      "description": "Modal Volume names for persistent caching. By default all deployments share the same volumes, so weights downloaded for one model are available to all. Use unique names to isolate a model's cache.",
+      "additionalProperties": false,
+      "default": {},
+      "properties": {
+        "hf_cache": {
+          "type": "string",
+          "default": "huggingface-cache",
+          "description": "Modal Volume name for the Hugging Face model weight cache. Models sharing a volume name share cached weights, saving disk space and download time. Use a unique name (e.g. 'huggingface-cache-my-model') to isolate a model's cache from others.",
+          "examples": ["huggingface-cache", "huggingface-cache-llama"]
+        },
+        "vllm_cache": {
+          "type": "string",
+          "default": "vllm-cache",
+          "description": "Modal Volume name for vLLM's JIT compilation cache. Caches compiled CUDA kernels to speed up warm starts. Use a unique name to isolate if different models use incompatible kernel configurations.",
+          "examples": ["vllm-cache", "vllm-cache-llama"]
+        }
+      }
+    }
+  }
+}

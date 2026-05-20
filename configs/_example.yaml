@@ -1,3 +1,4 @@
+# yaml-language-server: $schema=../schemas/model-config.schema.json
 # Template for adding a new model config.
 # Copy this file to configs/<your_model>.yaml and fill in the values.
 # Then deploy with: modal deploy main.py -- --config <your_model>
@@ -98,7 +99,7 @@ image:
   # OPTIONAL -- default: {} (no extra env vars)
   # Environment variables baked into the container image at build time.
   env:
-    HF_XET_HIGH_PERFORMANCE: "1"  # Faster HF Hub downloads via Xet transport
+    HF_XET_HIGH_PERFORMANCE: "1" # Faster HF Hub downloads via Xet transport
 
 volumes:
   # OPTIONAL -- default: "huggingface-cache" (shared across all models)
