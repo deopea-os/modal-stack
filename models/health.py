@@ -8,11 +8,20 @@ import aiohttp
 MINUTES = 60
 
 
-async def run_health_check(serve_fn: Any, served_name: str, timeout_s: float) -> None:
+async def run_health_check(
+    serve_fn: Any,
+    served_name: str,
+    timeout_s: float,
+    *,
+    api_key: str | None = None,
+) -> None:
     """Health-check a deployed serve function and send one test message."""
     url = await serve_fn.get_web_url.aio()
+    auth_headers = (
+        {"Authorization": f"Bearer {api_key}"} if api_key else {}
+    )
 
-    async with aiohttp.ClientSession(base_url=url) as session:
+    async with aiohttp.ClientSession(base_url=url, headers=auth_headers) as session:
         print(f"Health check: {url}/health")
         async with session.get(
             "/health",

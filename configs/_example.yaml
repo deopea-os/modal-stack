@@ -102,6 +102,13 @@ image:
   env:
     HF_XET_HIGH_PERFORMANCE: "1" # Faster HF Hub downloads via Xet transport
 
+# OPTIONAL -- Bearer token auth via Modal Secret
+# Create: modal secret create <token_name> AUTH_TOKEN=<your-token>
+# Deploy:  agents deploy <your_model> -t <token_name>
+# Or in YAML:
+# auth:
+#   token_name: "my-llm-auth"
+
 volumes:
   # OPTIONAL -- default: "huggingface-cache" (shared across all models)
   # Modal Volume name for the Hugging Face model weight cache.

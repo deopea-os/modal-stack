@@ -25,12 +25,29 @@ def _resolve_config(name: str) -> None:
         sys.exit(1)
 
 
+def _modal_env(config_name: str, token_name: str | None) -> dict[str, str]:
+    env = {**os.environ, "MODEL_CONFIG": config_name}
+    if token_name:
+        env["AUTH_TOKEN_NAME"] = token_name
+    return env
+
+
+def _add_token_name_arg(parser: argparse.ArgumentParser) -> None:
+    parser.add_argument(
+        "-t",
+        "--token-name",
+        metavar="NAME",
+        help="Modal Secret name for AUTH_TOKEN (not stored in config YAML). "
+        "Create with: modal secret create NAME AUTH_TOKEN=<token>",
+    )
+
+
 def _cmd_deploy(args: argparse.Namespace) -> None:
     _resolve_config(args.config)
     main_py = str(_ROOT / "main.py")
     subprocess.run(
         ["modal", "deploy", main_py],
-        env={**os.environ, "MODEL_CONFIG": args.config},
+        env=_modal_env(args.config, args.token_name),
         check=True,
     )
 
@@ -40,6 +57,7 @@ def _cmd_run(args: argparse.Namespace) -> None:
     main_py = str(_ROOT / "main.py")
     subprocess.run(
         ["modal", "run", main_py, "--", "--config", args.config],
+        env=_modal_env(args.config, args.token_name),
         check=True,
     )
 
@@ -96,9 +114,11 @@ def main() -> None:
 
     deploy_p = sub.add_parser("deploy", help="Deploy a model config to Modal")
     deploy_p.add_argument("config", help="Config name (resolves to configs/<name>.yaml)")
+    _add_token_name_arg(deploy_p)
 
     run_p = sub.add_parser("run", help="Spin up a model and run a health check")
     run_p.add_argument("config", help="Config name (resolves to configs/<name>.yaml)")
+    _add_token_name_arg(run_p)
 
     docs_p = sub.add_parser(
         "generate-docs",

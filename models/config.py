@@ -6,6 +6,7 @@ import yaml
 from pydantic import model_validator
 
 from ._generated import (
+    AuthConfig,
     EngineConfig,
     EngineType,
     GpuConfig,
@@ -18,6 +19,8 @@ from ._generated import (
 )
 
 __all__ = [
+    "apply_auth_token_name",
+    "AuthConfig",
     "EngineConfig",
     "EngineType",
     "GpuConfig",
@@ -28,6 +31,13 @@ __all__ = [
     "VllmArgsConfig",
     "VolumesConfig",
 ]
+
+
+def apply_auth_token_name(config: ModelConfig, token_name: str | None) -> ModelConfig:
+    """Set auth from a Modal Secret name (CLI/env). Overrides auth in YAML when set."""
+    if not token_name:
+        return config
+    return config.model_copy(update={"auth": AuthConfig(token_name=token_name)})
 
 
 class ModelConfig(ModelConfigBase):

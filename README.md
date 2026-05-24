@@ -34,6 +34,9 @@ pip install -r requirements.txt
 
 ```bash
 agents deploy gemma4_26b
+
+# With API auth:
+agents deploy gemma4_26b -t my-llm-auth
 ```
 
 ### Test a deployed model
@@ -155,6 +158,7 @@ All fields except `model.name` are optional. Defaults are shown below.
 | `vllm_args` | No | See below | Arguments passed to the 'vllm serve' command |
 | `image` | No | See below | Container image settings |
 | `volumes` | No | See below | Modal Volume names for persistent caching |
+| `auth` | No | See below | Optional Bearer token authentication for the OpenAI-compatible API |
 
 ### `model`
 
@@ -292,6 +296,16 @@ Common environment variables:
 | `vllm_cache` | `"vllm-cache"` | Modal Volume name for vLLM's JIT compilation cache. |
 
 Modal Volume names for persistent caching. By default all deployments share the same volumes, so weights downloaded for one model are available to all. Use unique names to isolate a model's cache.
+
+### `auth`
+
+| Field | Required | Default | Description |
+| ----- | -------- | ------- | ----------- |
+| `token_name` | **Yes** | — | Name of the Modal Secret that holds the API token. |
+
+Optional Bearer token authentication for the OpenAI-compatible API. The token value is stored in a Modal Secret, not in this config file.
+
+Create the secret with `modal secret create <token_name> AUTH_TOKEN=<your-token>`. The secret must define an `AUTH_TOKEN` key. vLLM enforces Bearer auth on `/v1` endpoints when auth is enabled. Pass the secret name at deploy or run time: `agents deploy <config> -t <token_name>` (or set `AUTH_TOKEN_NAME` in the environment).
 <!-- END GENERATED CONFIG REFERENCE -->
 
 ---
@@ -304,14 +318,16 @@ Once deployed, Modal prints a URL like:
 https://<workspace>--<app-name>-serve.modal.run
 ```
 
-This is a standard OpenAI-compatible endpoint. Use it with any OpenAI client:
+This is a standard OpenAI-compatible endpoint. Use it with any OpenAI client.
+
+If the config includes `auth.token_name`, create the Modal Secret first (`modal secret create <token_name> AUTH_TOKEN=<your-token>`) and pass the same token as the API key:
 
 ```python
 from openai import OpenAI
 
 client = OpenAI(
     base_url="https://<workspace>--<app-name>-serve.modal.run/v1",
-    api_key="unused",  # Modal handles auth via the URL
+    api_key="your-token",  # must match AUTH_TOKEN in the Modal Secret when auth is enabled
 )
 
 response = client.chat.completions.create(

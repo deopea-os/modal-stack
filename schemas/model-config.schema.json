@@ -19,9 +19,24 @@
     "scaling": { "$ref": "#/$defs/ScalingConfig" },
     "vllm_args": { "$ref": "#/$defs/VllmArgsConfig" },
     "image": { "$ref": "#/$defs/ImageConfig" },
-    "volumes": { "$ref": "#/$defs/VolumesConfig" }
+    "volumes": { "$ref": "#/$defs/VolumesConfig" },
+    "auth": { "$ref": "#/$defs/AuthConfig" }
   },
   "$defs": {
+    "AuthConfig": {
+      "type": "object",
+      "title": "Auth",
+      "description": "Optional Bearer token authentication for the OpenAI-compatible API. The token value is stored in a Modal Secret, not in this config file.",
+      "required": ["token_name"],
+      "additionalProperties": false,
+      "properties": {
+        "token_name": {
+          "type": "string",
+          "description": "Name of the Modal Secret that holds the API token. The secret must contain an AUTH_TOKEN key (see https://modal.com/docs/guide/webhooks#token-based-authentication). vLLM is started with --api-key so clients must send Authorization: Bearer <token> on /v1 requests. Create the secret with: modal secret create <token_name> AUTH_TOKEN=<your-token>. Alternatively pass at deploy or run time: agents deploy <config> -t <token_name>",
+          "examples": ["my-llm-auth", "gemma4-26b-auth"]
+        }
+      }
+    },
     "ModelSection": {
       "type": "object",
       "title": "Model",

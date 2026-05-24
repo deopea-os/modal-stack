@@ -278,7 +278,6 @@ def generate_config_reference() -> str:
     sections.append(_generate_section_table(schema, "VolumesConfig"))
     sections.append("")
 
-    # Volumes note from schema description
     volumes_def = schema["$defs"]["VolumesConfig"]
     volumes_desc = volumes_def.get("description", "")
     note_parts = volumes_desc.split(". ", 1)
@@ -286,6 +285,24 @@ def generate_config_reference() -> str:
         sections.append(f"{note_parts[0]}. {note_parts[1]}")
     else:
         sections.append(volumes_desc)
+    sections.append("")
+
+    sections.append("### `auth`")
+    sections.append("")
+    sections.append(_generate_section_table(schema, "AuthConfig", include_required=True))
+    sections.append("")
+
+    auth_def = schema["$defs"]["AuthConfig"]
+    auth_desc = auth_def.get("description", "")
+    sections.append(auth_desc)
+    sections.append("")
+    sections.append(
+        "Create the secret with `modal secret create <token_name> AUTH_TOKEN=<your-token>`. "
+        "The secret must define an `AUTH_TOKEN` key. "
+        "vLLM enforces Bearer auth on `/v1` endpoints when auth is enabled. "
+        "Pass the secret name at deploy or run time: "
+        "`agents deploy <config> -t <token_name>` (or set `AUTH_TOKEN_NAME` in the environment)."
+    )
 
     return "\n".join(sections)
 

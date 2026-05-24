@@ -50,11 +50,14 @@ if not _config_path.exists():
 # ---------------------------------------------------------------------------
 import modal
 
-from models.config import ModelConfig
+from models.config import ModelConfig, apply_auth_token_name
 from models.health import run_health_check
 from models.server import prepare_app
 
-config = ModelConfig.from_yaml(_config_path)
+config = apply_auth_token_name(
+    ModelConfig.from_yaml(_config_path),
+    os.environ.get("AUTH_TOKEN_NAME"),
+)
 _r = prepare_app(config)
 
 _root = Path(__file__).parent
@@ -74,23 +77,37 @@ _served_name = config.model.served_name
 _timeout_s = _r.timeout
 
 
-@app.function(
-    image=_image,
-    gpu=_r.gpu,
-    scaledown_window=_r.scaledown,
-    timeout=_r.timeout,
-    volumes={
+_function_kwargs: dict = {
+    "image": _image,
+    "gpu": _r.gpu,
+    "scaledown_window": _r.scaledown,
+    "timeout": _r.timeout,
+    "volumes": {
         "/root/.cache/huggingface": _r.hf_vol,
         "/root/.cache/vllm": _r.vllm_vol,
     },
-)
+}
+if _r.auth_secret_name:
+    _function_kwargs["secrets"] = [modal.Secret.from_name(_r.auth_secret_name)]
+
+
+@app.function(**_function_kwargs)
 @modal.concurrent(max_inputs=_r.max_inputs)
 @modal.web_server(port=_r.port, startup_timeout=_r.timeout)
 def serve():
+    import os
     import subprocess
-    subprocess.Popen(_cmd)
+
+    cmd = list(_cmd)
+    token = os.environ.get("AUTH_TOKEN")
+    if token:
+        cmd.extend(["--api-key", token])
+    subprocess.Popen(cmd)
 
 
 @app.local_entrypoint()
 async def test():
-    await run_health_check(serve, _served_name, _timeout_s)
+    import os
+
+    api_key = os.environ.get("AUTH_TOKEN") if config.auth else None
+    await run_health_check(serve, _served_name, _timeout_s, api_key=api_key)

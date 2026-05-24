@@ -31,6 +31,7 @@ _RENAMES: list[tuple[str, str]] = [
     ("class VLLMArguments(", "class VllmArgsConfig("),
     ("class Image(", "class ImageConfig("),
     ("class Volumes(", "class VolumesConfig("),
+    ("class Auth(", "class AuthConfig("),
     ("model: Model", "model: ModelSection"),
     ("engine: Engine", "engine: EngineConfig"),
     ("gpu: GPU", "gpu: GpuConfig"),
@@ -38,6 +39,7 @@ _RENAMES: list[tuple[str, str]] = [
     ("vllm_args: VLLMArguments", "vllm_args: VllmArgsConfig"),
     ("image: Image", "image: ImageConfig"),
     ("volumes: Volumes", "volumes: VolumesConfig"),
+    ("auth: Auth", "auth: AuthConfig"),
     ("type: Type | None", "type: EngineType | None"),
 ]
 

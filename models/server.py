@@ -22,6 +22,7 @@ class AppResources:
     scaledown: int
     timeout: int
     max_inputs: int
+    auth_secret_name: str | None = None
     port: int = VLLM_PORT
 
 
@@ -87,4 +88,5 @@ def prepare_app(config: ModelConfig) -> AppResources:
         scaledown=config.scaling.scaledown_window_minutes * MINUTES,
         timeout=config.scaling.timeout_minutes * MINUTES,
         max_inputs=config.scaling.max_concurrent_inputs,
+        auth_secret_name=config.auth.token_name if config.auth else None,
     )

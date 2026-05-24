@@ -18,6 +18,7 @@ Only `model.name` (Hugging Face repo ID) is required. Gather from the user:
 1. **Model repo** — e.g. `meta-llama/Llama-3.1-8B-Instruct`
 2. **GPU preference** — if not specified, use the sizing guide below (Modal GPU type strings)
 3. **Any special vLLM flags** — tool calling, reasoning, MoE, trust-remote-code, max-model-len, etc.
+4. **Auth** — if the endpoint should require a Bearer token, ask for a Modal Secret name (not the token value)
 
 ## GPU Sizing Guide
 
@@ -115,6 +116,38 @@ vllm_args:
     - "--trust-remote-code"
 ```
 
+## Authentication (optional)
+
+Protect `/v1` API calls with a Bearer token. The token value lives in a [Modal Secret](https://modal.com/docs/guide/secrets). See [Modal token-based authentication](https://modal.com/docs/guide/webhooks#token-based-authentication).
+
+1. Create the secret (once per workspace):
+
+   ```bash
+   modal secret create <token_name> AUTH_TOKEN=<your-token>
+   ```
+
+2. Pass the secret name at deploy/run:
+
+   ```bash
+   agents deploy <name> -t <token_name>
+   agents run <name> -t <token_name>
+   ```
+
+   Or set `AUTH_TOKEN_NAME=<token_name>` in the environment when calling `modal deploy` directly.
+
+3. Alternatively set it in YAML:
+
+   ```yaml
+   auth:
+     token_name: "<token_name>"
+   ```
+
+   CLI/env (`-t` / `AUTH_TOKEN_NAME`) overrides YAML when both are set.
+
+4. Clients send `Authorization: Bearer <your-token>` (OpenAI SDK: set `api_key` to the same value).
+
+For local health checks with auth, also export the token value: `export AUTH_TOKEN=<your-token>`.
+
 ## Defaults Reference
 
 Applied when a field is omitted (from schema / generated models):
@@ -139,6 +172,7 @@ Applied when a field is omitted (from schema / generated models):
 | `image.env` | `{}` |
 | `volumes.hf_cache` | `"huggingface-cache"` (shared) |
 | `volumes.vllm_cache` | `"vllm-cache"` (shared) |
+| `auth` | omitted (no auth) |
 
 ## Common `extra_args` Patterns
 

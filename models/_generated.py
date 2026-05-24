@@ -10,6 +10,17 @@ from enum import StrEnum
 from pydantic import BaseModel, ConfigDict, Field
 
 
+class AuthConfig(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    token_name: str = Field(
+        ...,
+        description='Name of the Modal Secret that holds the API token. The secret must contain an AUTH_TOKEN key (see https://modal.com/docs/guide/webhooks#token-based-authentication). vLLM is started with --api-key so clients must send Authorization: Bearer <token> on /v1 requests. Create the secret with: modal secret create <token_name> AUTH_TOKEN=<your-token>. Alternatively pass at deploy or run time: agents deploy <config> -t <token_name>',
+        examples=['my-llm-auth', 'gemma4-26b-auth'],
+    )
+
+
 class ModelSection(BaseModel):
     model_config = ConfigDict(
         extra='forbid',
@@ -194,3 +205,4 @@ class ModelConfigBase(BaseModel):
     vllm_args: VllmArgsConfig = Field(default_factory=VllmArgsConfig)
     image: ImageConfig = Field(default_factory=ImageConfig)
     volumes: VolumesConfig = Field(default_factory=VolumesConfig)
+    auth: AuthConfig | None = None
